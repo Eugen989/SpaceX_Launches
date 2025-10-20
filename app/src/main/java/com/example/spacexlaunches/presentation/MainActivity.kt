@@ -7,15 +7,18 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.example.spacexlaunches.R
 import com.example.spacexlaunches.data.Api
+import com.example.spacexlaunches.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
+    lateinit var binding: ActivityMainBinding
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
 
         val api = Api();
         api.getData();
 
+        binding = ActivityMainBinding.inflate(layoutInflater);
 
+        setContentView(binding.root);
     }
 }
