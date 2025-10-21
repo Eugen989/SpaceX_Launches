@@ -57,6 +57,7 @@ dependencies {
     // Room
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
+    implementation("androidx.room:room-paging:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
 
     // Lifecycle
@@ -70,5 +71,11 @@ dependencies {
 
     // RecyclerView
     implementation("androidx.recyclerview:recyclerview:1.3.2")
+
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+
+    implementation("androidx.paging:paging-runtime-ktx:3.2.1")
+//    implementation("androidx.paging:paging-compose:1.0.0-alpha20")
+    implementation("androidx.paging:paging-runtime-ktx:3.2.1")
 
 }

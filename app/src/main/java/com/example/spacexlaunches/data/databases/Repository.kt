@@ -14,7 +14,20 @@ class Repository(private val database: MainDatabase) {
         database.getDao().insertLaunch(launch)
     }
 
+    suspend fun insertAllLaunches(launches: List<LaunchEntity>) {
+        database.getDao().insertAllLaunches(launches)
+    }
+
     suspend fun clearAllLaunches() {
         database.getDao().clearAllLaunches()
+    }
+
+    suspend fun hasData(): Boolean {
+        val launches = database.getDao().getAllLaunches()
+        var hasData = false
+        launches.collect { list ->
+            hasData = list.isNotEmpty()
+        }
+        return hasData
     }
 }
