@@ -11,37 +11,13 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="SpaceX Database Demo"
+        android:text="SpaceX Launches"
         android:textSize="24sp"
         android:textStyle="bold"
         android:gravity="center"
         android:layout_marginBottom="16dp" />
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginBottom="16dp">
-
-        <EditText
-            android:id="@+id/nameEditText"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:hint="Item name"
-            android:layout_marginEnd="8dp" />
-
-        <EditText
-            android:id="@+id/priceEditText"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:hint="Price"
-            android:inputType="number"
-            android:layout_marginStart="8dp" />
-
-    </LinearLayout>
-
+    <!-- Buttons -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -49,11 +25,11 @@
         android:layout_marginBottom="16dp">
 
         <Button
-            android:id="@+id/addButton"
+            android:id="@+id/refreshButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Add Item"
+            android:text="Refresh Data"
             android:layout_marginEnd="8dp" />
 
         <Button
@@ -61,16 +37,23 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Refresh"
+            android:text="Clear Database"
             android:layout_marginStart="8dp" />
 
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/itemCountText"
+    <ProgressBar
+        android:id="@+id/progressBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Items in database: 0"
+        android:layout_marginBottom="8dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/launchCountText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Launches: 0"
         android:textSize="16sp"
         android:layout_marginBottom="8dp" />
 

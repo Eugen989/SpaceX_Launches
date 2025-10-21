@@ -2,43 +2,59 @@ package com.example.spacexlaunches.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
-import com.example.spacexlaunches.data.databases.Item
+import com.example.spacexlaunches.data.Api
+import com.example.spacexlaunches.data.databases.LaunchEntity
 import com.example.spacexlaunches.data.databases.MainDatabase
 import com.example.spacexlaunches.data.repository.Repository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class MainViewModel(database: MainDatabase) : ViewModel() {
 
     private val repository = Repository(database)
+    private val api = Api(database)
 
-    private val _items = MutableLiveData<List<Item>>()
-    val items: LiveData<List<Item>> = _items
+    private val _launches = MutableStateFlow<List<LaunchEntity>>(emptyList())
+    val launches: StateFlow<List<LaunchEntity>> = _launches.asStateFlow()
+
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     init {
-        loadItems()
+        loadLaunchesFromDatabase()
+        fetchLaunchesFromApi()
+    }
+
+    private fun loadLaunchesFromDatabase() {
         viewModelScope.launch {
-            // Вставляем тестовые данные при первом запуске
-            if (_items.value.isNullOrEmpty()) {
-                repository.insertSampleData()
-                loadItems()
+            repository.getAllLaunches().collect { launchesList ->
+                _launches.value = launchesList
             }
         }
     }
 
-    private fun loadItems() {
+    fun fetchLaunchesFromApi() {
+        _isLoading.value = true
+
+        api.fetchAndSaveLaunches()
+
         viewModelScope.launch {
-            repository.getAllItems().collect { itemsList ->
-                _items.value = itemsList
-            }
+            kotlinx.coroutines.delay(3000)
+            loadLaunchesFromDatabase()
+            _isLoading.value = false
         }
     }
 
-    fun addNewItem(name: String, price: Int) {
+    fun refreshData() {
+        fetchLaunchesFromApi()
+    }
+
+    fun clearDatabase() {
         viewModelScope.launch {
-            repository.insertItem(Item(name = name, price = price))
-            loadItems()
+            repository.clearAllLaunches()
+            loadLaunchesFromDatabase()
         }
     }
 }

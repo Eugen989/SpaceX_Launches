@@ -1,13 +1,15 @@
-package com.example.spacexlaunches.data;
+package com.example.spacexlaunches.data
 
-import com.example.spacexlaunches.data.models.Launch;
+import com.example.spacexlaunches.data.models.Launch
+import com.example.spacexlaunches.data.models.Rocket
+import retrofit2.Call
+import retrofit2.http.GET
+import retrofit2.http.Path
 
-import java.util.List;
-
-import retrofit2.Call;
-import retrofit2.http.GET;
-
-public interface ApiService {
+interface ApiService {
     @GET("launches")
-    Call<List<Launch>> getSpaceXData();
+    fun getSpaceXLaunches(): Call<List<Launch>>
+
+    @GET("rockets/{id}")
+    fun getRocketById(@Path("id") id: String): Call<Rocket>
 }

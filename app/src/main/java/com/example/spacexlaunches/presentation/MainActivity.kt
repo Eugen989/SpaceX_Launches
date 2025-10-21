@@ -5,9 +5,9 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.example.spacexlaunches.data.Api
 import com.example.spacexlaunches.data.databases.MainDatabase
 import com.example.spacexlaunches.databinding.ActivityMainBinding
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -16,13 +16,10 @@ class MainActivity : AppCompatActivity() {
     private val viewModel: MainViewModel by viewModels {
         MainViewModelFactory(MainDatabase.getDb(this))
     }
-    private lateinit var adapter: ItemAdapter
+    private lateinit var adapter: LaunchAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        val api = Api()
-        api.getData()
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -33,7 +30,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupRecyclerView() {
-        adapter = ItemAdapter()
+        adapter = LaunchAdapter()
         binding.recyclerView.apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
             adapter = this@MainActivity.adapter
@@ -41,41 +38,28 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupObservers() {
-        viewModel.items.observe(this) { items ->
-            adapter.submitList(items)
-            binding.itemCountText.text = "Items in database: ${items.size}"
+        lifecycleScope.launch {
+            viewModel.launches.collectLatest { launches ->
+                adapter.submitList(launches)
+                binding.launchCountText.text = "Launches: ${launches.size}"
+            }
+        }
+
+        lifecycleScope.launch {
+            viewModel.isLoading.collect { isLoading ->
+                binding.progressBar.visibility = if (isLoading) android.view.View.VISIBLE else android.view.View.GONE
+                binding.refreshButton.isEnabled = !isLoading
+            }
         }
     }
 
     private fun setupClickListeners() {
-        binding.addButton.setOnClickListener {
-            val name = binding.nameEditText.text.toString().trim()
-            val priceText = binding.priceEditText.text.toString().trim()
-
-            if (name.isNotEmpty() && priceText.isNotEmpty()) {
-                val price = priceText.toIntOrNull() ?: 0
-                viewModel.addNewItem(name, price)
-                binding.nameEditText.text.clear()
-                binding.priceEditText.text.clear()
-            }
+        binding.refreshButton.setOnClickListener {
+            viewModel.refreshData()
         }
 
         binding.clearButton.setOnClickListener {
-            lifecycleScope.launch {
-                // Здесь нужно добавить функциональность очистки базы данных
-            }
+            viewModel.clearDatabase()
         }
-    }
-}
-
-// Factory для ViewModel
-class MainViewModelFactory(private val database: MainDatabase) :
-    androidx.lifecycle.ViewModelProvider.Factory {
-    override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return MainViewModel(database) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }
