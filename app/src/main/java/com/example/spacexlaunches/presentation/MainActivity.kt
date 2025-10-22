@@ -47,7 +47,9 @@ class MainActivity : AppCompatActivity() {
         setupObservers()
         setupClickListeners()
 
-        viewModel.loadData(this)
+        if (!viewModel.isDataLoaded()) {
+            viewModel.loadData(this)
+        }
 
         Log.d("DataSourceLog", "Activity created - loading initial data")
     }
@@ -71,7 +73,11 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 override fun onClearSearch() {
-
+                    viewModel.currentLaunches.value?.let { launches ->
+                        if (launches.isNotEmpty()) {
+                            activityUseCase.setHasData(true)
+                        }
+                    }
                 }
             }
         )
@@ -113,11 +119,11 @@ class MainActivity : AppCompatActivity() {
     private fun setupObservers() {
         lifecycleScope.launch {
             viewModel.currentLaunches.collect { launches ->
-
                 Log.d("Pagination", "Updating adapter with ${launches.size} launches")
-
                 adapter.submitList(launches)
                 updateUI(launches)
+
+                activityUseCase.setHasData(launches.isNotEmpty() || viewModel.isDataLoaded())
             }
         }
 
@@ -145,7 +151,6 @@ class MainActivity : AppCompatActivity() {
             viewModel.errorMessage.collect { errorMessage ->
                 errorMessage?.let { message ->
                     showSnackbar(message)
-
                     Log.e("DataSourceLog", "Error: $message")
 
                     lifecycleScope.launch {
@@ -184,14 +189,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateLoadingState(isLoading: Boolean) {
-        binding.progressBar.visibility = if (isLoading) View.VISIBLE else View.GONE
+        binding.progressBar.visibility = if (isLoading && !viewModel.isDataLoaded()) View.VISIBLE else View.GONE
+
         binding.refreshButton.isEnabled = !isLoading
         binding.clearButton.isEnabled = !isLoading
 
         val hasData = activityUseCase.hasData.value ?: false
         val isSearching = activityUseCase.isSearching.value ?: false
 
-        if (isLoading) {
+        if (isLoading && !viewModel.isDataLoaded()) {
             binding.pageNavigationLayout.visibility = View.GONE
             binding.pageInfoText.visibility = View.GONE
             binding.emptyStateText.visibility = View.GONE

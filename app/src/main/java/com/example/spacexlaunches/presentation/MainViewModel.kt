@@ -40,13 +40,20 @@ class MainViewModel(
 
     private var allLaunches: List<LaunchEntity> = emptyList()
 
+    private var dataLoaded = false
+
     fun loadData(context: Context) {
+        if (dataLoaded && allLaunches.isNotEmpty()) {
+            return
+        }
+
         _isLoading.value = true
 
         viewModelScope.launch {
             getLaunchesUseCase.loadData(context, object : GetLaunchesUseCase.LoadDataCallback {
                 override fun onSuccess(launches: List<LaunchEntity>) {
                     allLaunches = launches
+                    dataLoaded = true
                     setupPagination()
                     _isLoading.value = false
                 }
@@ -54,10 +61,15 @@ class MainViewModel(
                 override fun onError(message: String) {
                     _errorMessage.value = message
                     _isLoading.value = false
+                    if (allLaunches.isNotEmpty()) {
+                        dataLoaded = true
+                    }
                 }
 
                 override fun onLoading(isLoading: Boolean) {
-                    _isLoading.value = isLoading
+                    if (!dataLoaded) {
+                        _isLoading.value = isLoading
+                    }
                 }
             })
         }
@@ -108,6 +120,9 @@ class MainViewModel(
     }
 
     fun refreshData(context: Context) {
+        dataLoaded = false
+        _isLoading.value = true
+
         refreshDataUseCase.refreshData(context, object : RefreshDataUseCase.RefreshCallback {
             override fun onSuccess() {
                 loadData(context)
@@ -115,10 +130,17 @@ class MainViewModel(
 
             override fun onError(message: String) {
                 _errorMessage.value = message
+                _isLoading.value = false
+
+                if (allLaunches.isNotEmpty()) {
+                    dataLoaded = true
+                }
             }
 
             override fun onLoading(isLoading: Boolean) {
-                _isLoading.value = isLoading
+                if (!dataLoaded) {
+                    _isLoading.value = isLoading
+                }
             }
         })
     }
@@ -130,10 +152,15 @@ class MainViewModel(
             _totalPages.value = 1
             _pageInfo.value = ""
             allLaunches = emptyList()
+            dataLoaded = false
         })
     }
 
     fun clearError() {
         _errorMessage.value = null
+    }
+
+    fun isDataLoaded(): Boolean {
+        return dataLoaded && allLaunches.isNotEmpty()
     }
 }
