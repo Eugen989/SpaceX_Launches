@@ -13,6 +13,7 @@ import androidx.recyclerview.widget.RecyclerView
 import coil.load
 import com.example.spacexlaunches.R
 import com.example.spacexlaunches.data.models.LaunchEntity
+import com.example.spacexlaunches.domain.usecase.LaunchDetailActivity
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

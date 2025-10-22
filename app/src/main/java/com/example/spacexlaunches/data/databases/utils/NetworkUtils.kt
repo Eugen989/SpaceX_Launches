@@ -7,6 +7,7 @@ import android.os.Build
 
 object NetworkUtils {
 
+    @JvmStatic
     fun isInternetAvailable(context: Context): Boolean {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 

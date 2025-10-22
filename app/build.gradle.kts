@@ -80,4 +80,7 @@ dependencies {
 
     implementation("io.coil-kt:coil:2.4.0")
 
+    implementation("com.github.bumptech.glide:glide:4.14.2")
+
+
 }

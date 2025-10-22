@@ -1,11 +1,15 @@
 package com.example.spacexlaunches.data.repository
 
+import android.content.Context
 import android.util.Log
 import com.example.spacexlaunches.data.MainDatabase
 import com.example.spacexlaunches.data.models.LaunchEntity
 import com.example.spacexlaunches.data.models.Launch
 import com.example.spacexlaunches.data.models.Rocket
+import com.example.spacexlaunches.utils.NetworkUtils
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class PaginationRepository(
@@ -143,5 +147,36 @@ class PaginationRepository(
 
     fun getAllLaunches(): List<LaunchEntity> {
         return allLaunches
+    }
+    interface JavaCallback<T> {
+        fun onResult(result: T)
+    }
+
+    @JvmOverloads
+    fun loadAllLaunchesJava(callback: JavaCallback<Boolean>) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val success = loadAllLaunches()
+            callback.onResult(success)
+        }
+    }
+
+    @JvmOverloads
+    fun getAllLaunchesJava(callback: JavaCallback<List<LaunchEntity>>) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val launches = getAllLaunches()
+            callback.onResult(launches)
+        }
+    }
+
+    @JvmOverloads
+    fun loadDataWithNetworkCheck(context: Context, callback: JavaCallback<Boolean>) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val success = if (NetworkUtils.isInternetAvailable(context)) {
+                loadAllLaunches()
+            } else {
+                getAllLaunches().isNotEmpty()
+            }
+            callback.onResult(success)
+        }
     }
 }

@@ -25,7 +25,7 @@
         </activity>
 
         <activity
-            android:name=".presentation.LaunchDetailActivity"
+            android:name=".domain.usecase.LaunchDetailActivity"
             android:exported="false"
             android:parentActivityName=".presentation.MainActivity" />
     </application>

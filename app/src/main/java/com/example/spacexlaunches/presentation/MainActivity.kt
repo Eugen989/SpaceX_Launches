@@ -5,28 +5,33 @@ import android.util.Log
 import android.view.View
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.widget.addTextChangedListener
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.spacexlaunches.data.ApiService
 import com.example.spacexlaunches.data.MainDatabase
-import com.example.spacexlaunches.data.models.LaunchEntity
 import com.example.spacexlaunches.databinding.ActivityMainBinding
-import com.example.spacexlaunches.presentation.MainViewModel.FilterType
+import com.example.spacexlaunches.domain.usecase.*
 import com.google.android.material.snackbar.Snackbar
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private val viewModel: MainViewModel by viewModels {
-        MainViewModelFactory(MainDatabase.getDb(this))
+        val retrofit = Retrofit.Builder()
+            .baseUrl("https://api.spacexdata.com/v4/")
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+        val apiService = retrofit.create(ApiService::class.java)
+
+        MainViewModelFactory(MainDatabase.getDb(this), apiService)
     }
     private lateinit var adapter: LaunchAdapter
 
-    private var lastRefreshTime: Long = 0
-    private val REFRESH_INTERVAL = 5 * 60 * 1000
+    private lateinit var activityUseCase: ActivityUseCase
+    private lateinit var dataRefreshUseCase: DataRefreshUseCase
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,15 +39,15 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        activityUseCase = ActivityUseCase()
+        dataRefreshUseCase = DataRefreshUseCase()
+
         setupRecyclerView()
+        setupUseCases()
         setupObservers()
         setupClickListeners()
-        setupSearch()
-        setupFilterButtons()
 
         viewModel.loadData(this)
-
-        lastRefreshTime = System.currentTimeMillis()
 
         Log.d("DataSourceLog", "Activity created - loading initial data")
     }
@@ -56,103 +61,63 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun setupSearch() {
-        binding.searchEditText.addTextChangedListener { editable ->
-            val query = editable?.toString() ?: ""
-            viewModel.searchLaunches(query)
+    private fun setupUseCases() {
+        activityUseCase.setupSearchLogic(
+            binding.searchEditText,
+            binding.clearSearchButton,
+            object : ActivityUseCase.SearchCallback {
+                override fun onSearch(query: String) {
+                    viewModel.searchLaunches(query)
+                }
 
-            binding.clearSearchButton.visibility =
-                if (query.isNotBlank()) View.VISIBLE else View.GONE
-        }
+                override fun onClearSearch() {
 
-        binding.clearSearchButton.setOnClickListener {
-            binding.searchEditText.setText("")
-            viewModel.clearSearch()
-            binding.clearSearchButton.visibility = View.GONE
-        }
+                }
+            }
+        )
+
+        setupFilterButtons()
     }
 
     private fun setupFilterButtons() {
         binding.filterLayout.visibility = View.VISIBLE
 
         binding.allFilterButton.setOnClickListener {
-            viewModel.setFilter(FilterType.ALL)
-            updateFilterButtons(FilterType.ALL)
+            viewModel.setFilter(FilterLaunchesUseCase.FilterType.ALL)
+            updateFilterButtons(FilterLaunchesUseCase.FilterType.ALL)
         }
 
         binding.upcomingFilterButton.setOnClickListener {
-            viewModel.setFilter(FilterType.UPCOMING)
-            updateFilterButtons(FilterType.UPCOMING)
+            viewModel.setFilter(FilterLaunchesUseCase.FilterType.UPCOMING)
+            updateFilterButtons(FilterLaunchesUseCase.FilterType.UPCOMING)
         }
 
         binding.pastFilterButton.setOnClickListener {
-            viewModel.setFilter(FilterType.PAST)
-            updateFilterButtons(FilterType.PAST)
+            viewModel.setFilter(FilterLaunchesUseCase.FilterType.PAST)
+            updateFilterButtons(FilterLaunchesUseCase.FilterType.PAST)
         }
 
-        updateFilterButtons(FilterType.ALL)
+        updateFilterButtons(FilterLaunchesUseCase.FilterType.ALL)
     }
 
-    private fun updateFilterButtons(selectedFilter: FilterType) {
-        binding.allFilterButton.isSelected = selectedFilter == FilterType.ALL
-        binding.upcomingFilterButton.isSelected = selectedFilter == FilterType.UPCOMING
-        binding.pastFilterButton.isSelected = selectedFilter == FilterType.PAST
-
-        updateButtonAppearance(binding.allFilterButton, selectedFilter == FilterType.ALL)
-        updateButtonAppearance(binding.upcomingFilterButton, selectedFilter == FilterType.UPCOMING)
-        updateButtonAppearance(binding.pastFilterButton, selectedFilter == FilterType.PAST)
-    }
-
-    private fun updateButtonAppearance(button: android.widget.Button, isSelected: Boolean) {
-        if (isSelected) {
-            button.setBackgroundColor(getColor(android.R.color.holo_blue_dark))
-            button.setTextColor(getColor(android.R.color.white))
-        } else {
-            button.setBackgroundColor(getColor(android.R.color.darker_gray))
-            button.setTextColor(getColor(android.R.color.black))
-        }
+    private fun updateFilterButtons(selectedFilter: FilterLaunchesUseCase.FilterType) {
+        activityUseCase.updateFilterButtons(
+            selectedFilter,
+            binding.allFilterButton,
+            binding.upcomingFilterButton,
+            binding.pastFilterButton,
+            this
+        )
     }
 
     private fun setupObservers() {
         lifecycleScope.launch {
-            viewModel.filteredLaunches.collect { launches ->
-                Log.d("Search", "Updating adapter with ${launches.size} filtered launches")
+            viewModel.currentLaunches.collect { launches ->
+
+                Log.d("Pagination", "Updating adapter with ${launches.size} launches")
 
                 adapter.submitList(launches)
-                updateSearchUI(launches)
-            }
-        }
-
-        lifecycleScope.launch {
-            viewModel.currentLaunches.collect { launches ->
-                if (!viewModel.isSearching.value) {
-                    Log.d("Pagination", "Updating adapter with ${launches.size} launches")
-                    adapter.submitList(launches)
-                    updateSearchUI(launches)
-                }
-            }
-        }
-
-        lifecycleScope.launch {
-            viewModel.isSearching.collect { isSearching ->
-                if (isSearching) {
-                    binding.searchInfoText.visibility = View.VISIBLE
-                    binding.pageNavigationLayout.visibility = View.GONE
-                    binding.pageInfoText.visibility = View.GONE
-                    binding.filterLayout.visibility = View.GONE
-                } else {
-                    binding.searchInfoText.visibility = View.GONE
-                    binding.pageNavigationLayout.visibility = View.VISIBLE
-                    binding.pageInfoText.visibility = View.VISIBLE
-                    binding.filterLayout.visibility = View.VISIBLE
-                }
-            }
-        }
-
-        lifecycleScope.launch {
-            viewModel.pageInfo.collect { info ->
-                binding.pageInfoText.text = info
-                Log.d("Pagination", "Page info: $info")
+                updateUI(launches)
             }
         }
 
@@ -171,51 +136,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         lifecycleScope.launch {
-            viewModel.hasData.collect { hasData ->
-                Log.d("LoadingDebug", "hasData changed: $hasData")
-                if (hasData && viewModel.isLoading.value) {
-                    lifecycleScope.launch {
-                        delay(300)
-                    }
-                }
-            }
-        }
-
-        lifecycleScope.launch {
             viewModel.isLoading.collect { isLoading ->
-                binding.progressBar.visibility = if (isLoading) View.VISIBLE else View.GONE
-                binding.refreshButton.isEnabled = !isLoading
-                binding.clearButton.isEnabled = !isLoading
-
-                if (isLoading) {
-                    binding.pageNavigationLayout.visibility = View.GONE
-                    binding.pageInfoText.visibility = View.GONE
-                    binding.emptyStateText.visibility = View.GONE
-                    binding.filterLayout.visibility = View.GONE
-                } else {
-                    val hasData = viewModel.hasData.value
-                    binding.pageNavigationLayout.visibility = if (hasData && !viewModel.isSearching.value) View.VISIBLE else View.GONE
-                    binding.pageInfoText.visibility = if (hasData && !viewModel.isSearching.value) View.VISIBLE else View.GONE
-                    binding.filterLayout.visibility = if (hasData && !viewModel.isSearching.value) View.VISIBLE else View.GONE
-
-                    if (!hasData && !viewModel.isSearching.value) {
-                        binding.emptyStateText.text = "No launches available"
-                        binding.emptyStateText.visibility = View.VISIBLE
-                    } else {
-                        binding.emptyStateText.visibility = View.GONE
-                    }
-                }
-
-                if (!viewModel.isSearching.value) {
-                    val currentPage = viewModel.currentPage.value
-                    val totalPages = viewModel.totalPages.value
-                    updateNavigationButtons(currentPage, totalPages, isLoading)
-                } else {
-                    binding.previousButton.isEnabled = false
-                    binding.nextButton.isEnabled = false
-                }
-
-                Log.d("LoadingDebug", "Is loading: $isLoading")
+                updateLoadingState(isLoading)
             }
         }
 
@@ -223,10 +145,11 @@ class MainActivity : AppCompatActivity() {
             viewModel.errorMessage.collect { errorMessage ->
                 errorMessage?.let { message ->
                     showSnackbar(message)
+
                     Log.e("DataSourceLog", "Error: $message")
 
                     lifecycleScope.launch {
-                        delay(3000)
+                        kotlinx.coroutines.delay(3000)
                         viewModel.clearError()
                     }
                 }
@@ -234,66 +157,92 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun updateSearchUI(launches: List<LaunchEntity>) {
-        if (launches.isEmpty()) {
-            if (viewModel.isSearching.value) {
-                binding.emptyStateText.text = "No launches found for '${viewModel.searchQuery.value}'"
-                binding.emptyStateText.visibility = View.VISIBLE
-            } else if (!viewModel.isLoading.value && !viewModel.hasData.value) {
-                binding.emptyStateText.text = "No launches available"
-                binding.emptyStateText.visibility = View.VISIBLE
-            } else if (!viewModel.isLoading.value && viewModel.hasData.value) {
-                when (viewModel.currentFilter.value) {
-                    FilterType.UPCOMING -> binding.emptyStateText.text = "No upcoming launches"
-                    FilterType.PAST -> binding.emptyStateText.text = "No past launches"
+    private fun updateUI(launches: List<com.example.spacexlaunches.data.models.LaunchEntity>) {
+        val isLoading = viewModel.isLoading.value
+        val currentFilter = viewModel.currentFilter.value
 
-                    else -> binding.emptyStateText.text = "No launches available"
-                }
-                binding.emptyStateText.visibility = View.VISIBLE
-            }
+        activityUseCase.updateSearchUI(
+            launches,
+            isLoading,
+            currentFilter,
+            binding.emptyStateText,
+            binding.searchInfoText
+        )
+
+        val isSearching = activityUseCase.isSearching.value ?: false
+        if (isSearching) {
+            binding.searchInfoText.visibility = View.VISIBLE
+            binding.pageNavigationLayout.visibility = View.GONE
+            binding.pageInfoText.visibility = View.GONE
+            binding.filterLayout.visibility = View.GONE
         } else {
+            binding.searchInfoText.visibility = View.GONE
+            binding.pageNavigationLayout.visibility = View.VISIBLE
+            binding.pageInfoText.visibility = View.VISIBLE
+            binding.filterLayout.visibility = View.VISIBLE
+        }
+    }
+
+    private fun updateLoadingState(isLoading: Boolean) {
+        binding.progressBar.visibility = if (isLoading) View.VISIBLE else View.GONE
+        binding.refreshButton.isEnabled = !isLoading
+        binding.clearButton.isEnabled = !isLoading
+
+        val hasData = activityUseCase.hasData.value ?: false
+        val isSearching = activityUseCase.isSearching.value ?: false
+
+        if (isLoading) {
+            binding.pageNavigationLayout.visibility = View.GONE
+            binding.pageInfoText.visibility = View.GONE
             binding.emptyStateText.visibility = View.GONE
+            binding.filterLayout.visibility = View.GONE
+        } else {
+            binding.pageNavigationLayout.visibility = if (hasData && !isSearching) View.VISIBLE else View.GONE
+            binding.pageInfoText.visibility = if (hasData && !isSearching) View.VISIBLE else View.GONE
+            binding.filterLayout.visibility = if (hasData && !isSearching) View.VISIBLE else View.GONE
         }
 
-        if (viewModel.isSearching.value) {
-            val query = viewModel.searchQuery.value
-            val resultCount = launches.size
-
-            binding.searchInfoText.text = "Search: '$query' found $resultCount result(s)"
+        if (!isSearching) {
+            val currentPage = viewModel.currentPage.value
+            val totalPages = viewModel.totalPages.value
+            activityUseCase.updateNavigationButtons(
+                currentPage,
+                totalPages,
+                isLoading,
+                binding.previousButton,
+                binding.nextButton
+            )
+        } else {
+            binding.previousButton.isEnabled = false
+            binding.nextButton.isEnabled = false
         }
     }
 
     private fun updatePageNavigation(currentPage: Int, totalPages: Int) {
         binding.pageNavigationText.text = "Page $currentPage of $totalPages"
 
-        if (!viewModel.isSearching.value) {
-            updateNavigationButtons(currentPage, totalPages, viewModel.isLoading.value)
+        if (!(activityUseCase.isSearching.value ?: false)) {
+            activityUseCase.updateNavigationButtons(
+                currentPage,
+                totalPages,
+                viewModel.isLoading.value,
+                binding.previousButton,
+                binding.nextButton
+            )
         }
-
-        Log.d("Pagination", "Updated navigation: Page $currentPage of $totalPages")
-    }
-
-    private fun updateNavigationButtons(currentPage: Int, totalPages: Int, isLoading: Boolean) {
-        binding.previousButton.isEnabled = !isLoading && currentPage > 1
-        binding.nextButton.isEnabled = !isLoading && currentPage < totalPages
-
-        Log.d("Pagination", "Buttons - Previous: ${binding.previousButton.isEnabled}, Next: ${binding.nextButton.isEnabled}")
     }
 
     private fun setupClickListeners() {
         binding.refreshButton.setOnClickListener {
             Log.d("DataSourceLog", "Refresh button clicked")
-
-            viewModel.refreshData(this) {
-                lastRefreshTime = System.currentTimeMillis()
-
-                Log.d("RefreshDebug", "Manual refresh completed, time updated")
-            }
+            viewModel.refreshData(this)
+            dataRefreshUseCase.updateRefreshTime()
         }
 
         binding.clearButton.setOnClickListener {
             Log.d("DataSourceLog", "Clear button clicked")
             viewModel.clearDatabase()
+            activityUseCase.setHasData(false)
         }
 
         binding.previousButton.setOnClickListener {
@@ -313,31 +262,15 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-
         Log.d("DataSourceLog", "Activity resumed")
 
-        if (shouldRefreshData()) {
+        val hasData = activityUseCase.hasData.value ?: false
+        if (dataRefreshUseCase.shouldRefreshData(hasData)) {
             Log.d("DataSourceLog", "Data is stale, refreshing...")
-            viewModel.refreshData(this) {
-                lastRefreshTime = System.currentTimeMillis()
-
-                Log.d("RefreshDebug", "Auto refresh completed, time updated")
-            }
+            viewModel.refreshData(this)
+            dataRefreshUseCase.updateRefreshTime()
         } else {
             Log.d("DataSourceLog", "Data is fresh, no refresh needed")
         }
-    }
-
-    private fun shouldRefreshData(): Boolean {
-        return !viewModel.hasData.value || isDataStale()
-    }
-
-    private fun isDataStale(): Boolean {
-        val currentTime = System.currentTimeMillis()
-        val timeSinceLastRefresh = currentTime - lastRefreshTime
-
-        Log.d("RefreshDebug", "Time since last refresh: ${timeSinceLastRefresh / 1000} seconds, limit: ${REFRESH_INTERVAL / 1000} seconds")
-
-        return timeSinceLastRefresh > REFRESH_INTERVAL
     }
 }
