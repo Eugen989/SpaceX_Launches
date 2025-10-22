@@ -1,9 +1,10 @@
 package com.example.spacexlaunches.data.repository
 
 import android.util.Log
-import com.example.spacexlaunches.data.databases.LaunchEntity
-import com.example.spacexlaunches.data.databases.MainDatabase
+import com.example.spacexlaunches.data.MainDatabase
+import com.example.spacexlaunches.data.models.LaunchEntity
 import com.example.spacexlaunches.data.models.Launch
+import com.example.spacexlaunches.data.models.Rocket
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -43,6 +44,7 @@ class PaginationRepository(
             }
         } catch (e: Exception) {
             Log.e("PaginationRepo", "Error loading launches: ${e.message}")
+
             loadFromDatabase()
         }
     }
@@ -51,7 +53,9 @@ class PaginationRepository(
         return try {
             val launches = database.getDao().getAllLaunchesList()
             allLaunches = launches.sortedByDescending { it.flightNumber }
+
             Log.d("PaginationRepo", "Loaded ${allLaunches.size} launches from database")
+
             allLaunches.isNotEmpty()
         } catch (e: Exception) {
             Log.e("PaginationRepo", "Error loading from database: ${e.message}")
@@ -88,17 +92,27 @@ class PaginationRepository(
 
         for (launch in launches) {
             if (isValidLaunch(launch)) {
-                val rocketType = getRocketType(launch.rocket!!)
+                val rocket = getRocketDetails(launch.rocket!!)
                 val launchEntity = LaunchEntity(
                     id = launch.id!!,
                     name = launch.name!!,
                     dateUtc = launch.dateUtc!!,
                     success = launch.success,
                     rocketId = launch.rocket!!,
-                    rocketType = rocketType,
+                    rocketType = rocket?.type,
                     details = launch.details,
                     flightNumber = launch.flightNumber ?: 0,
-                    upcoming = launch.upcoming ?: false
+                    upcoming = launch.upcoming ?: false,
+                    rocketName = rocket?.name,
+                    rocketCompany = rocket?.company,
+                    rocketCountry = rocket?.country,
+                    rocketDescription = rocket?.description,
+                    rocketImages = rocket?.flickrImages?.firstOrNull(),
+                    rocketWikipedia = rocket?.wikipedia,
+                    rocketActive = rocket?.active,
+                    rocketStages = rocket?.stages,
+                    rocketCostPerLaunch = rocket?.costPerLaunch,
+                    rocketSuccessRate = rocket?.successRatePct
                 )
                 launchEntities.add(launchEntity)
             }
@@ -114,16 +128,20 @@ class PaginationRepository(
                 launch.rocket != null
     }
 
-    private suspend fun getRocketType(rocketId: String): String? {
+    private suspend fun getRocketDetails(rocketId: String): Rocket? {
         return try {
             val response = apiService.getRocketById(rocketId)
             if (response.isSuccessful) {
-                response.body()?.type
+                response.body()
             } else {
                 null
             }
         } catch (e: Exception) {
             null
         }
+    }
+
+    fun getAllLaunches(): List<LaunchEntity> {
+        return allLaunches
     }
 }

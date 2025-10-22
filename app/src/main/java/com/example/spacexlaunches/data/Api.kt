@@ -1,8 +1,7 @@
 package com.example.spacexlaunches.data
 
 import android.util.Log
-import com.example.spacexlaunches.data.databases.LaunchEntity
-import com.example.spacexlaunches.data.databases.MainDatabase
+import com.example.spacexlaunches.data.models.LaunchEntity
 import com.example.spacexlaunches.data.models.Launch
 import com.example.spacexlaunches.data.models.Rocket
 import com.example.spacexlaunches.utils.Constants
@@ -36,12 +35,10 @@ class Api(private val database: MainDatabase) {
                         processAndSaveLaunches(launches, onSuccess)
                     } else {
                         Log.d("MyApiLog", "No launches received or empty list")
-
                         onError?.invoke()
                     }
                 } else {
                     Log.d("MyApiLog", "Error in get launches. Code: ${response.code()}")
-
                     try {
                         Log.d("MyApiLog", "Error body: ${response.errorBody()?.string()}")
                     } catch (e: Exception) {
@@ -65,6 +62,8 @@ class Api(private val database: MainDatabase) {
             for (launch in launches) {
                 if (launch.id != null && launch.name != null && launch.dateUtc != null && launch.rocket != null) {
                     val rocketType = getRocketType(launch.rocket)
+                    val rocketDetails = getRocketDetails(launch.rocket)
+
                     val launchEntity = LaunchEntity(
                         id = launch.id,
                         name = launch.name,
@@ -74,7 +73,17 @@ class Api(private val database: MainDatabase) {
                         rocketType = rocketType,
                         details = launch.details,
                         flightNumber = launch.flightNumber ?: 0,
-                        upcoming = launch.upcoming ?: false
+                        upcoming = launch.upcoming ?: false,
+                        rocketName = rocketDetails?.name,
+                        rocketCompany = rocketDetails?.company,
+                        rocketCountry = rocketDetails?.country,
+                        rocketDescription = rocketDetails?.description,
+                        rocketImages = rocketDetails?.flickrImages?.firstOrNull(),
+                        rocketWikipedia = rocketDetails?.wikipedia,
+                        rocketActive = rocketDetails?.active,
+                        rocketStages = rocketDetails?.stages,
+                        rocketCostPerLaunch = rocketDetails?.costPerLaunch,
+                        rocketSuccessRate = rocketDetails?.successRatePct
                     )
                     launchEntities.add(launchEntity)
                 } else {
@@ -90,7 +99,6 @@ class Api(private val database: MainDatabase) {
                 onSuccess?.invoke()
             } else {
                 Log.w("MyApiLog", "No valid launches to save")
-
                 onSuccess?.invoke()
             }
         } catch (e: Exception) {
@@ -109,6 +117,20 @@ class Api(private val database: MainDatabase) {
             }
         } catch (e: Exception) {
             Log.e("MyApiLog", "Error fetching rocket type for $rocketId: ${e.message}")
+            null
+        }
+    }
+
+    private suspend fun getRocketDetails(rocketId: String): Rocket? {
+        return try {
+            val response = apiService.getRocketById(rocketId)
+            if (response.isSuccessful) {
+                response.body()
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.e("MyApiLog", "Error fetching rocket details for $rocketId: ${e.message}")
             null
         }
     }

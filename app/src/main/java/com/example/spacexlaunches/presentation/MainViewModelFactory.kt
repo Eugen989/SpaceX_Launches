@@ -2,7 +2,7 @@ package com.example.spacexlaunches.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.example.spacexlaunches.data.databases.MainDatabase
+import com.example.spacexlaunches.data.MainDatabase
 
 class MainViewModelFactory(private val database: MainDatabase) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")

@@ -9,7 +9,7 @@ import androidx.paging.PagingDataAdapter
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.example.spacexlaunches.R
-import com.example.spacexlaunches.data.databases.LaunchEntity
+import com.example.spacexlaunches.data.models.LaunchEntity
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

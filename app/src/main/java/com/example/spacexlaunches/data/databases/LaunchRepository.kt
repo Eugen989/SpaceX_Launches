@@ -1,9 +1,10 @@
 package com.example.spacexlaunches.data.repository
 
 import android.util.Log
-import com.example.spacexlaunches.data.databases.LaunchEntity
-import com.example.spacexlaunches.data.databases.MainDatabase
+import com.example.spacexlaunches.data.MainDatabase
+import com.example.spacexlaunches.data.models.LaunchEntity
 import com.example.spacexlaunches.data.models.Launch
+import com.example.spacexlaunches.data.models.Rocket
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import retrofit2.HttpException
@@ -28,7 +29,9 @@ class LaunchRepository(
                 val launchEntities = mutableListOf<LaunchEntity>()
                 for (launch in launches) {
                     if (isValidLaunch(launch)) {
-                        val rocketType = getRocketType(launch.rocket)
+                        val rocketType = getRocketType(launch.rocket!!)
+                        val rocketDetails = getRocketDetails(launch.rocket!!)
+
                         val launchEntity = LaunchEntity(
                             id = launch.id!!,
                             name = launch.name!!,
@@ -38,7 +41,17 @@ class LaunchRepository(
                             rocketType = rocketType,
                             details = launch.details,
                             flightNumber = launch.flightNumber ?: 0,
-                            upcoming = launch.upcoming ?: false
+                            upcoming = launch.upcoming ?: false,
+                            rocketName = rocketDetails?.name,
+                            rocketCompany = rocketDetails?.company,
+                            rocketCountry = rocketDetails?.country,
+                            rocketDescription = rocketDetails?.description,
+                            rocketImages = rocketDetails?.flickrImages?.firstOrNull(),
+                            rocketWikipedia = rocketDetails?.wikipedia,
+                            rocketActive = rocketDetails?.active,
+                            rocketStages = rocketDetails?.stages,
+                            rocketCostPerLaunch = rocketDetails?.costPerLaunch,
+                            rocketSuccessRate = rocketDetails?.successRatePct
                         )
                         launchEntities.add(launchEntity)
                     }
@@ -48,6 +61,7 @@ class LaunchRepository(
                     database.getDao().insertAllLaunches(launchEntities)
 
                     Log.d("LaunchRepository", "Saved ${launchEntities.size} launches to database")
+
                     true
                 } else {
                     Log.w("LaunchRepository", "No valid launches to save")
@@ -73,9 +87,21 @@ class LaunchRepository(
     private suspend fun getRocketType(rocketId: String): String? {
         return try {
             val response = apiService.getRocketById(rocketId)
-
             if (response.isSuccessful) {
                 response.body()?.type
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private suspend fun getRocketDetails(rocketId: String): Rocket? {
+        return try {
+            val response = apiService.getRocketById(rocketId)
+            if (response.isSuccessful) {
+                response.body()
             } else {
                 null
             }

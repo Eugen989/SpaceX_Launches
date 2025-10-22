@@ -3,14 +3,17 @@ package com.example.spacexlaunches.data.paging
 import android.util.Log
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
-import com.example.spacexlaunches.data.databases.LaunchEntity
+import com.example.spacexlaunches.data.ApiService
+import com.example.spacexlaunches.data.MainDatabase
+import com.example.spacexlaunches.data.models.LaunchEntity
 import com.example.spacexlaunches.data.models.Launch
+import com.example.spacexlaunches.data.models.Rocket
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class LaunchesPagingSource(
-    private val apiService: com.example.spacexlaunches.data.ApiService,
-    private val database: com.example.spacexlaunches.data.databases.MainDatabase,
+    private val apiService: ApiService,
+    private val database: MainDatabase,
     private val onDataSourceChanged: (String) -> Unit
 ) : PagingSource<Int, LaunchEntity>() {
 
@@ -110,6 +113,8 @@ class LaunchesPagingSource(
         for (launch in launches) {
             if (isValidLaunch(launch)) {
                 val rocketType = getRocketType(launch.rocket!!)
+                val rocketDetails = getRocketDetails(launch.rocket!!)
+
                 val launchEntity = LaunchEntity(
                     id = launch.id!!,
                     name = launch.name!!,
@@ -119,13 +124,36 @@ class LaunchesPagingSource(
                     rocketType = rocketType,
                     details = launch.details,
                     flightNumber = launch.flightNumber ?: 0,
-                    upcoming = launch.upcoming ?: false
+                    upcoming = launch.upcoming ?: false,
+                    rocketName = rocketDetails?.name,
+                    rocketCompany = rocketDetails?.company,
+                    rocketCountry = rocketDetails?.country,
+                    rocketDescription = rocketDetails?.description,
+                    rocketImages = rocketDetails?.flickrImages?.firstOrNull(),
+                    rocketWikipedia = rocketDetails?.wikipedia,
+                    rocketActive = rocketDetails?.active,
+                    rocketStages = rocketDetails?.stages,
+                    rocketCostPerLaunch = rocketDetails?.costPerLaunch,
+                    rocketSuccessRate = rocketDetails?.successRatePct
                 )
                 launchEntities.add(launchEntity)
             }
         }
 
         return launchEntities
+    }
+
+    private suspend fun getRocketDetails(rocketId: String): Rocket? {
+        return try {
+            val response = apiService.getRocketById(rocketId)
+            if (response.isSuccessful) {
+                response.body()
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
     }
 
     private suspend fun loadFromDatabase(page: Int, pageSize: Int): LoadResult<Int, LaunchEntity> {

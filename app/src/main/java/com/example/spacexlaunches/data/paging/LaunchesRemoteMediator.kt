@@ -5,8 +5,9 @@ import androidx.paging.LoadType
 import androidx.paging.PagingState
 import androidx.paging.RemoteMediator
 import androidx.room.withTransaction
-import com.example.spacexlaunches.data.databases.LaunchEntity
-import com.example.spacexlaunches.data.databases.MainDatabase
+import com.example.spacexlaunches.data.MainDatabase
+import com.example.spacexlaunches.data.models.LaunchEntity
+import com.example.spacexlaunches.data.models.Rocket
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import retrofit2.HttpException
@@ -36,6 +37,8 @@ class LaunchesRemoteMediator(
                 launches.forEach { launch ->
                     if (launch.id != null && launch.name != null && launch.dateUtc != null && launch.rocket != null) {
                         val rocketType = getRocketType(launch.rocket)
+                        val rocketDetails = getRocketDetails(launch.rocket)
+
                         val launchEntity = LaunchEntity(
                             id = launch.id,
                             name = launch.name,
@@ -45,7 +48,17 @@ class LaunchesRemoteMediator(
                             rocketType = rocketType,
                             details = launch.details,
                             flightNumber = launch.flightNumber ?: 0,
-                            upcoming = launch.upcoming ?: false
+                            upcoming = launch.upcoming ?: false,
+                            rocketName = rocketDetails?.name,
+                            rocketCompany = rocketDetails?.company,
+                            rocketCountry = rocketDetails?.country,
+                            rocketDescription = rocketDetails?.description,
+                            rocketImages = rocketDetails?.flickrImages?.firstOrNull(),
+                            rocketWikipedia = rocketDetails?.wikipedia,
+                            rocketActive = rocketDetails?.active,
+                            rocketStages = rocketDetails?.stages,
+                            rocketCostPerLaunch = rocketDetails?.costPerLaunch,
+                            rocketSuccessRate = rocketDetails?.successRatePct
                         )
                         launchEntities.add(launchEntity)
                     }
@@ -61,6 +74,19 @@ class LaunchesRemoteMediator(
             MediatorResult.Error(e)
         } catch (e: HttpException) {
             MediatorResult.Error(e)
+        }
+    }
+
+    private suspend fun getRocketDetails(rocketId: String): Rocket? {
+        return try {
+            val response = apiService.getRocketById(rocketId)
+            if (response.isSuccessful) {
+                response.body()
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
         }
     }
 
